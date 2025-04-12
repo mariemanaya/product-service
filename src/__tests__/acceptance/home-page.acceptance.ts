@@ -1,9 +1,9 @@
 import {Client} from '@loopback/testlab';
-import {OpenfoodfactBackendApplication} from '../..';
+import {ProductServiceApplication} from '../..';
 import {setupApplication} from './test-helper';
 
 describe('HomePage', () => {
-  let app: OpenfoodfactBackendApplication;
+  let app: ProductServiceApplication;
   let client: Client;
 
   before('setupApplication', async () => {

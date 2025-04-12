@@ -10,14 +10,19 @@ import {ServiceMixin} from '@loopback/service-proxy';
 import path from 'path';
 import {MySequence} from './sequence';
 import {ProductController} from './controllers/product.controller';
+import {AuthenticationComponent} from '@loopback/authentication';
+
 export {ApplicationConfig};
 
-export class OpenfoodfactBackendApplication extends BootMixin(
+export class ProductServiceApplication extends BootMixin(
   ServiceMixin(RepositoryMixin(RestApplication)),
 ) {
   constructor(options: ApplicationConfig = {}) {
     super(options);
     this.controller(ProductController);
+    this.component(AuthenticationComponent);
+
+
 
     // Set up the custom sequence
     this.sequence(MySequence);

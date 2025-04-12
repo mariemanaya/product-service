@@ -1,4 +1,4 @@
-import {OpenfoodfactBackendApplication} from '../..';
+import {ProductServiceApplication} from '../..';
 import {
   createRestAppClient,
   givenHttpServerConfig,
@@ -14,7 +14,7 @@ export async function setupApplication(): Promise<AppWithClient> {
     // port: +process.env.PORT,
   });
 
-  const app = new OpenfoodfactBackendApplication({
+  const app = new ProductServiceApplication({
     rest: restConfig,
   });
 
@@ -27,6 +27,6 @@ export async function setupApplication(): Promise<AppWithClient> {
 }
 
 export interface AppWithClient {
-  app: OpenfoodfactBackendApplication;
+  app: ProductServiceApplication;
   client: Client;
 }

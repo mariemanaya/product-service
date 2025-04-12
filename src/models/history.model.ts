@@ -1,40 +1,36 @@
 import {Entity, model, property} from '@loopback/repository';
 
-@model()
+@model({settings: {mongodb: {collection: 'history'}}})
 export class History extends Entity {
   @property({
     type: 'string',
     id: true,
     generated: true,
   })
-  id?: string;
+  _id?: string;
+
+  @property({type: 'string', required: true})
+  uid: string;
+
+  @property({type: 'string', required: true})
+  product_id: string;
 
   @property({
     type: 'string',
     required: true,
+    jsonSchema: {enum: ['scan', 'view']}
   })
-  barcode: string;
+  actionType: string;
 
-  @property({
-    type: 'string',
-  })
+  @property({type: 'string', required: true})
+  timestamp: string;
+
+  // 🔽 Champs en lecture seule, ajoutés dynamiquement (non stockés en DB)
+  @property({type: 'string'})
   productName?: string;
 
-  @property({
-    type: 'string',
-  })
-  nutriScore?: string;
-
-  @property({
-    type: 'string',
-  })
-  ingredients?: string;
-
-  @property({
-    type: 'date',
-    defaultFn: 'now',
-  })
-  createdAt?: string;
+  @property({type: 'string'})
+  imageUrl?: string;
 
   constructor(data?: Partial<History>) {
     super(data);

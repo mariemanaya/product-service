@@ -1,7 +1,7 @@
 {
-  "name": "openfoodfact-backend",
+  "name": "product-service",
   "version": "0.0.1",
-  "description": "openfoodfact-backend",
+  "description": "product-service ",
   "keywords": [
     "loopback-application",
     "loopback"
@@ -49,13 +49,19 @@
     "!*/__tests__"
   ],
   "dependencies": {
+    "@loopback/authentication": "^11.0.12",
+    "@loopback/authentication-jwt": "^0.15.12",
     "@loopback/boot": "^7.0.10",
     "@loopback/core": "^6.1.7",
     "@loopback/repository": "^7.0.10",
     "@loopback/rest": "^14.0.10",
     "@loopback/rest-explorer": "^7.0.10",
+    "@loopback/security": "^0.11.12",
     "@loopback/service-proxy": "^7.0.10",
     "axios": "^1.7.9",
+    "firebase-admin": "^13.2.0",
+    "jsonwebtoken": "^9.0.2",
+    "loopback-connector-mongodb": "^6.3.1",
     "mongodb": "^6.13.0",
     "tslib": "^2.0.0"
   },
