@@ -6,7 +6,7 @@ import {ProductRepository} from '../repositories/product.repository';
 import {HistoryRepository} from '../repositories/history.repository';
 import {History} from '../models/history.model';
 import {FavoriteRepository} from '../repositories/favorite.repository';
-import {Favorite} from '../models/favorite.model';
+
 
 export class ProductController {
   constructor(
@@ -45,6 +45,7 @@ export class ProductController {
       where: {
         uid: body.uid,
         productId: body.product_id,
+
       },
     });
 
@@ -152,7 +153,7 @@ export class ProductController {
       where: {uid},
       order: ['timestamp DESC'],
       limit: 50,
-      fields: {_id: false}
+
     });
 
     if (historyEntries.length === 0) return [];
@@ -422,17 +423,26 @@ export class ProductController {
     return "Not available";
   }
 
-  @del('/products/history/uid')
-  async deleteHistoryByUid(
-    @param.query.string('uid') uid: string,
+  @del('/products/history/{id}')
+  async deleteHistory(
+    @param.path.string('id') id: string, // Utiliser _id comme paramètre d'URL
   ): Promise<{message: string}> {
-    if (!uid) throw new HttpErrors.BadRequest('UID required');
-
-    const deleted = await this.historyRepository.deleteAll({uid});
-    if (deleted.count === 0) {
-      throw new HttpErrors.NotFound('No history found for this UID');
+    if (!id) {
+      throw new HttpErrors.BadRequest('_id is required');
     }
 
-    return {message: 'History deleted successfully'};
+    try {
+      // Supprimer l'entrée avec l'_id spécifié
+      await this.historyRepository.deleteById(id);
+
+      return {message: 'History entry deleted successfully'};
+    } catch (error: any) {
+      // Si l'entrée n'existe pas, LoopBack lève une erreur NotFound
+      if (error.code === 'ENTITY_NOT_FOUND') {
+        throw new HttpErrors.NotFound(`No history found for _id ${id}`);
+      }
+      // Propager d'autres erreurs
+      throw new HttpErrors.InternalServerError(error.message);
+    }
   }
 }
