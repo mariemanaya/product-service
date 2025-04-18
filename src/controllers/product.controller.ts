@@ -423,6 +423,7 @@ export class ProductController {
     return "Not available";
   }
 
+
   @del('/products/history/{id}')
   async deleteHistory(
     @param.path.string('id') id: string, // Utiliser _id comme paramètre d'URL
