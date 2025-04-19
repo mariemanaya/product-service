@@ -6,7 +6,8 @@ import {ProductRepository} from '../repositories/product.repository';
 import {HistoryRepository} from '../repositories/history.repository';
 import {History} from '../models/history.model';
 import {FavoriteRepository} from '../repositories/favorite.repository';
-
+import {UserPreferencesRepository} from '../repositories/user-preferences.repository'; // Nouvelle importation
+import {UserPreferences} from '../models/user-preferences.model';
 
 export class ProductController {
   constructor(
@@ -16,10 +17,56 @@ export class ProductController {
     public historyRepository: HistoryRepository,
     @repository(FavoriteRepository)
     public favoriteRepository: FavoriteRepository,
+    @repository(UserPreferencesRepository)
+    public userPreferencesRepository: UserPreferencesRepository,
+
   ) {}
 
   private USER_AGENT = 'openfoodfacts/1.0 (mariemanaya20@gmail.com)';
 
+  @post('/user-preferences')
+  async updateUserPreferences(
+    @requestBody({
+      content: {
+        'application/json': {
+          schema: {
+            type: 'object',
+            properties: {
+              uid: { type: 'string' }, // ❗ uid au lieu de userId
+              allergens: {
+                type: 'array',
+                items: { type: 'string' }
+              }
+            },
+            required: ['uid', 'allergens'] // ❗ uid au lieu de userId
+          }
+        }
+      }
+    })
+    body: { uid: string; allergens: string[] }, // ❗ uid au lieu de userId
+  ): Promise<void> {
+    const existing = await this.userPreferencesRepository.findOne({
+      where: { uid: body.uid } // ❗ uid au lieu de userId
+    });
+
+    if (existing) {
+      await this.userPreferencesRepository.updateById(existing.uid, { // ❗ uid
+        allergens: body.allergens
+      });
+    } else {
+      await this.userPreferencesRepository.create({
+        uid: body.uid, // ❗ uid
+        allergens: body.allergens
+      });
+    }
+  }
+
+  @get('/user-preferences/{uid}')
+  async getUserPreferences(
+    @param.path.string('uid') uid: string,
+  ): Promise<UserPreferences | null> {
+    return this.userPreferencesRepository.findOne({where: {uid}});
+  }
   // ************************** FAVORIS ************************** //
   @post('/favorites/toggle')
   async toggleFavorite(
@@ -179,7 +226,7 @@ export class ProductController {
   @get('/products/{code}', {
     responses: {
       '200': {
-        description: 'Product model with isFavorite',
+        description: 'Product model with allergen alerts',
         content: {
           'application/json': {
             schema: {
@@ -194,7 +241,9 @@ export class ProductController {
                 brand: {type: 'string'},
                 halalStatus: {type: 'boolean'},
                 imageUrl: {type: 'string'},
-                isFavorite: {type: 'boolean'}
+                isFavorite: {type: 'boolean'},
+                containsUserAllergen: {type: 'boolean'},
+                alertMessage: {type: 'string'},
               }
             }
           }
@@ -205,36 +254,53 @@ export class ProductController {
   async getProduct(
     @param.path.string('code') code: string,
     @param.query.string('uid') uid?: string,
-  ): Promise<Product & {isFavorite: boolean}> {
+  ): Promise<Product & {isFavorite: boolean; containsUserAllergen?: boolean; alertMessage?: string}> {
     const product = await this._getProductDetails(code);
-
     let isFavorite = false;
+    let containsUserAllergen = false;
+    let alertMessage: string | undefined;
+
     if (uid) {
-      const count = await this.favoriteRepository.count({
+      // Vérification des favoris
+      const favoriteCount = await this.favoriteRepository.count({
         uid: uid,
         productId: code
       });
-      isFavorite = count.count > 0;
+      isFavorite = favoriteCount.count > 0;
+
+      // Vérification des allergènes
+      const userPrefs = await this.userPreferencesRepository.findOne({where: {uid}});
+      const userAllergens = userPrefs?.allergens || [];
+
+      if (product.allergens && product.allergens !== 'Not available') {
+        const productAllergens = product.allergens
+          .split(',')
+          .map(a => a.trim().toLowerCase());
+
+        containsUserAllergen = productAllergens.some(allergen =>
+          userAllergens.includes(allergen)
+        );
+
+        if (containsUserAllergen) {
+          alertMessage = `⚠️ Contient : ${productAllergens
+            .filter(a => userAllergens.includes(a))
+            .join(', ')}`;
+        }
+      }
     }
 
-
+    // Correction finale : Combinaison de toObject() et des nouvelles propriétés
     return {
-      code: product.code,
-      name: product.name,
-      nutriscore: product.nutriscore,
-      ingredients: product.ingredients,
-      categories: product.categories,
-      allergens: product.allergens,
-      brand: product.brand,
-      halalStatus: product.halalStatus,
-      imageUrl: product.imageUrl,
-      isFavorite
-    } as Product & { isFavorite: boolean };
+      ...product.toObject(), // Conversion en objet simple
+      isFavorite,
+      containsUserAllergen,
+      alertMessage
+    } as Product & {isFavorite: boolean; containsUserAllergen?: boolean; alertMessage?: string};
   }
   @get('/products/search/{name}', {
     responses: {
       '200': {
-        description: 'Array of Product with isFavorite',
+        description: 'Array of Product with allergen alerts',
         content: {
           'application/json': {
             schema: {
@@ -251,7 +317,9 @@ export class ProductController {
                   brand: {type: 'string'},
                   halalStatus: {type: 'boolean'},
                   imageUrl: {type: 'string'},
-                  isFavorite: {type: 'boolean'}
+                  isFavorite: {type: 'boolean'},
+                  containsUserAllergen: {type: 'boolean'}, // Nouveau champ
+                  alertMessage: {type: 'string'}, // Nouveau champ
                 }
               }
             }
@@ -263,20 +331,48 @@ export class ProductController {
   async searchProducts(
     @param.path.string('name') name: string,
     @param.query.string('uid') uid?: string,
-  ): Promise<(Product & {isFavorite: boolean})[]> {
+  ): Promise<(Product & { isFavorite: boolean; containsUserAllergen?: boolean; alertMessage?: string })[]> {
     const dbResults = await this.productRepository.find({
       where: {name: {regexp: `/${name}/i`}},
       limit: 20
     });
 
-    if (dbResults.length >= 10) {
-      return await this._addFavoritesStatus(dbResults, uid);
+    let apiResults: Product[] = [];
+    if (dbResults.length < 10) {
+      apiResults = await this.fetchFromOpenFoodFacts(name);
     }
 
-    const apiResults = await this.fetchFromOpenFoodFacts(name);
     const allResults = [...dbResults, ...apiResults].slice(0, 20);
-    return await this._addFavoritesStatus(allResults, uid);
+    const productsWithFavorites = await this._addFavoritesStatus(allResults, uid);
+
+    if (!uid) {
+      return productsWithFavorites; // Retourne directement les instances existantes
+    }
+
+    const userPrefs = await this.userPreferencesRepository.findOne({where: {uid: uid}});
+    const userAllergens = userPrefs?.allergens || [];
+
+    return productsWithFavorites.map(product => {
+      const productAllergens = product.allergens?.split(', ') || [];
+      const containsUserAllergen = productAllergens.some(allergen =>
+        userAllergens.includes(allergen.toLowerCase())
+      );
+
+      // Ajoute les propriétés à l'instance existante sans la désestructurer
+      return Object.assign(
+        product,
+        {
+          containsUserAllergen,
+          alertMessage: containsUserAllergen
+            ? `⚠️ Contient des allergènes que vous évitez : ${productAllergens.filter(a =>
+                userAllergens.includes(a.toLowerCase())
+              ).join(', ')}`
+            : undefined
+        }
+      ) as Product & { isFavorite: boolean; containsUserAllergen?: boolean; alertMessage?: string };
+    });
   }
+
 
   // ************************** MÉTHODES PRIVÉES ************************** //
   private async _addFavoritesStatus(
@@ -305,7 +401,6 @@ export class ProductController {
     if (existingProduct) return existingProduct;
 
     const apiUrl = `https://world.openfoodfacts.org/api/v2/product/${code}.json`;
-
     const response = await axios.get(apiUrl, {
       headers: {'User-Agent': this.USER_AGENT}
     });
@@ -323,12 +418,13 @@ export class ProductController {
       brand: this.formatText(productData.brands),
       categories: this.formatText(productData.categories),
       halalStatus: productData.labels?.includes("Halal") || false,
-      allergens: this.formatText(productData.allergens),
+      allergens: this.formatText(productData.allergens_hierarchy || productData.allergens), // Modification
       imageUrl: productData.image_url || ""
     });
 
     return this.productRepository.create(newProduct);
   }
+
 
   private async fetchFromOpenFoodFacts(name: string): Promise<Product[]> {
     const products: Product[] = [];
