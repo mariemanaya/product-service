@@ -80,7 +80,7 @@ export class Product extends Entity {
   @property({
     type: 'boolean',
     required: false,
-    transient: true, // Important pour une propriété calculée
+    transient: true, 
     jsonSchema: {
       readOnly: true
     }

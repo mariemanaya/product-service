@@ -72,7 +72,7 @@ export class ProductController {
 
 
 
-  // ************************** FAVORIS ************************** //
+  //  FAVORIS //
   @post('/favorites/toggle')
   async toggleFavorite(
     @requestBody({
@@ -116,7 +116,7 @@ export class ProductController {
     product_id: string;
     product_name: string;
     image_url: string;
-    isFavorite: boolean; // Ajoutez cette propriété
+    isFavorite: boolean;
   }>> {
     if (!uid) throw new HttpErrors.BadRequest('UID required');
     const favorites = await this.favoriteRepository.find({
@@ -131,11 +131,11 @@ export class ProductController {
       product_id: fav.productId,
       product_name: products.find(p => p.code === fav.productId)?.name || 'Unknown',
       image_url: products.find(p => p.code === fav.productId)?.imageUrl || '',
-      isFavorite: true, // Définissez explicitement isFavorite à true
+      isFavorite: true,
     }));
   }
 
-  // ************************** HISTORIQUE ************************** //
+  //  HISTORIQUE  //
   @post('/products/scan')
   async recordScan(
     @requestBody({
@@ -209,7 +209,7 @@ export class ProductController {
     return {message: 'History entry deleted successfully'};
   }
 
-  // ************************** PRODUITS ************************** //
+  //  PRODUITS  //
   private async addFavoriteStatus(product: Product, uid?: string): Promise<Product> {
     // Vérification des favoris
     const isFavorite = uid ?
@@ -262,7 +262,7 @@ export class ProductController {
   }
 
 
-  // ************************** METHODES PRIVEES ************************** //
+  // METHODES PRIVEES //
   private async fetchOrCreateProduct(code: string): Promise<Product> {
     const existing = await this.productRepository.findOne({where: {code}});
     if (existing) return existing;

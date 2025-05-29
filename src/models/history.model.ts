@@ -25,7 +25,7 @@ export class History extends Entity {
   @property({type: 'string', required: true})
   timestamp: string;
 
-  // 🔽 Champs en lecture seule, ajoutés dynamiquement (non stockés en DB)
+
   @property({type: 'string'})
   productName?: string;
 
